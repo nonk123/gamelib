@@ -4,5 +4,5 @@ extern crate glium;
 mod game;
 mod render;
 
-pub use crate::game::{run_game, Context, Game, GameConfig};
+pub use crate::game::{run_game, Context, Game, GameConfig, KeyCode};
 pub use crate::render::Canvas;

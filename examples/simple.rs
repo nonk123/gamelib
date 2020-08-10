@@ -2,11 +2,15 @@ use gamelib::*;
 
 struct Simple {
     angle: f32,
+    vel: f32,
 }
 
 impl Simple {
     fn new() -> Self {
-        Self { angle: 0.0 }
+        Self {
+            angle: 0.0,
+            vel: 0.5,
+        }
     }
 }
 
@@ -16,7 +20,11 @@ impl Game for Simple {
     }
 
     fn update(&mut self, context: &mut Context) {
-        self.angle += std::f32::consts::PI * context.delta;
+        self.angle += std::f32::consts::PI * self.vel * context.delta;
+
+        if context.was_pressed(KeyCode::Space) {
+            self.vel = -self.vel;
+        }
     }
 
     fn render(&mut self, canvas: &mut Canvas) {

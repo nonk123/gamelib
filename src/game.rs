@@ -3,8 +3,7 @@ use glium::glutin::event_loop::ControlFlow;
 use glium::glutin::window::WindowBuilder;
 use glium::glutin::ContextBuilder;
 
-use glium::glutin::event::Event;
-use glium::glutin::event::WindowEvent;
+use glium::glutin::event::{ElementState, Event, WindowEvent};
 
 use glium::{Display, Program};
 
@@ -12,6 +11,8 @@ use std::sync::Mutex;
 use std::time::Instant;
 
 use crate::render::{Canvas, Model};
+
+pub use glium::glutin::event::VirtualKeyCode as KeyCode;
 
 pub struct GameConfig {
     pub title: String,
@@ -26,6 +27,7 @@ pub trait Game {
 
 pub struct Context {
     pub delta: f32,
+    pressed: Vec<KeyCode>,
     display: Display,
     program: Program,
     rect: Model,
@@ -55,6 +57,7 @@ impl Context {
 
         Self {
             delta: 0.0,
+            pressed: Vec::new(),
             display,
             program,
             rect,
@@ -63,6 +66,33 @@ impl Context {
 
     fn new_canvas(&self) -> Canvas {
         Canvas::new(self.display.draw(), &self.program, &self.rect)
+    }
+
+    fn press(&mut self, key: KeyCode) {
+        self.pressed.push(key);
+    }
+
+    fn release(&mut self, key: KeyCode) {
+        let index = self.pressed.binary_search(&key);
+
+        if let Ok(index) = index {
+            self.pressed.remove(index);
+        }
+    }
+
+    pub fn is_held(&self, key: KeyCode) -> bool {
+        self.pressed.contains(&key)
+    }
+
+    pub fn was_pressed(&mut self, key: KeyCode) -> bool {
+        let held = self.is_held(key);
+
+        if held {
+            self.release(key);
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -118,6 +148,14 @@ pub fn run_game<T: 'static + Game>(game: T) {
                     WindowEvent::CloseRequested => {
                         *control_flow = ControlFlow::Exit;
                         return;
+                    }
+                    WindowEvent::KeyboardInput { input, .. } => {
+                        if let Some(key) = input.virtual_keycode {
+                            match input.state {
+                                ElementState::Pressed => context.press(key),
+                                ElementState::Released => context.release(key),
+                            }
+                        }
                     }
                     _ => {}
                 },
