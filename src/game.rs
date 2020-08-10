@@ -1,5 +1,5 @@
 use glium::glutin::dpi::LogicalSize;
-use glium::glutin::event_loop::{ControlFlow, EventLoop};
+use glium::glutin::event_loop::ControlFlow;
 use glium::glutin::window::WindowBuilder;
 use glium::glutin::ContextBuilder;
 
@@ -14,13 +14,56 @@ use std::time::Instant;
 use crate::render::{Canvas, Model};
 
 pub struct GameConfig {
-    title: String,
-    window_size: (u32, u32),
+    pub title: String,
+    pub window_size: (u32, u32),
 }
 
 pub trait Game {
     fn configure(&self, _config: &mut GameConfig) {}
-    fn tick(&mut self, canvas: &mut Canvas, delta: f32);
+    fn render(&mut self, canvas: &mut Canvas);
+    fn update(&mut self, context: &mut Context);
+}
+
+pub struct Context {
+    pub delta: f32,
+    display: Display,
+    program: Program,
+    rect: Model,
+}
+
+type EventLoop = glium::glutin::event_loop::EventLoop<()>;
+
+impl Context {
+    fn new(config: GameConfig, event_loop: &EventLoop) -> Self {
+        let (width, height) = config.window_size;
+
+        let window_builder = WindowBuilder::new()
+            .with_inner_size(LogicalSize::new(width, height))
+            .with_title(config.title);
+
+        let context_builder = ContextBuilder::new().with_vsync(true);
+
+        let display = Display::new(window_builder, context_builder, &event_loop).unwrap();
+
+        let program = Program::from_source(&display, VERTEX_SHADER, FRAGMENT_SHADER, None).unwrap();
+
+        let rect = Model::new(
+            &display,
+            &[(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)],
+            &[0, 1, 3, 2],
+        );
+
+        Self {
+            delta: 0.0,
+            display,
+            program,
+            rect,
+        }
+    }
+
+    fn new_canvas(&self) -> Canvas {
+        Canvas::new(self.display.draw(), &self.program, &self.rect)
+    }
 }
 
 static VERTEX_SHADER: &str = "
@@ -64,23 +107,7 @@ pub fn run_game<T: 'static + Game>(game: T) {
 
     let event_loop = EventLoop::new();
 
-    let (width, height) = config.window_size;
-
-    let window_builder = WindowBuilder::new()
-        .with_inner_size(LogicalSize::new(width, height))
-        .with_title(config.title);
-
-    let context_builder = ContextBuilder::new().with_vsync(true);
-
-    let display = Display::new(window_builder, context_builder, &event_loop).unwrap();
-
-    let program = Program::from_source(&display, VERTEX_SHADER, FRAGMENT_SHADER, None).unwrap();
-
-    let rect = Model::new(
-        &display,
-        &[(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)],
-        &[0, 1, 3, 2],
-    );
+    let mut context = Context::new(config, &event_loop);
 
     let mut previous_frame = Instant::now();
 
@@ -99,10 +126,13 @@ pub fn run_game<T: 'static + Game>(game: T) {
         }
 
         let this_frame = Instant::now();
-        let delta = this_frame.duration_since(previous_frame).as_secs_f32();
 
-        let mut canvas = Canvas::new(display.draw(), &program, &rect);
-        game.get_mut().unwrap().tick(&mut canvas, delta);
+        context.delta = this_frame.duration_since(previous_frame).as_secs_f32();
+
+        game.get_mut().unwrap().update(&mut context);
+
+        let mut canvas = context.new_canvas();
+        game.get_mut().unwrap().render(&mut canvas);
         canvas.finish();
 
         previous_frame = this_frame;

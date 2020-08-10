@@ -11,9 +11,15 @@ impl Simple {
 }
 
 impl Game for Simple {
-    fn tick(&mut self, canvas: &mut Canvas, delta: f32) {
-        self.angle += std::f32::consts::PI * delta;
+    fn configure(&self, config: &mut GameConfig) {
+        config.title = "Simple".into();
+    }
 
+    fn update(&mut self, context: &mut Context) {
+        self.angle += std::f32::consts::PI * context.delta;
+    }
+
+    fn render(&mut self, canvas: &mut Canvas) {
         let dist = 0.5;
         let size = 0.1;
 
