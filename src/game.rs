@@ -7,6 +7,7 @@ use glium::glutin::event::{ElementState, Event, WindowEvent};
 
 use glium::{Display, Program};
 
+use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::Instant;
 
@@ -22,7 +23,7 @@ pub struct GameConfig {
 pub trait Game {
     fn configure(&self, _config: &mut GameConfig) {}
     fn init(&mut self, _context: &mut Context) {}
-    fn render(&mut self, _canvas: &mut Canvas) {}
+    fn render(&mut self, _canvas: &mut Canvas, _context: &mut Context) {}
     fn update(&mut self, _context: &mut Context) {}
 }
 
@@ -42,10 +43,9 @@ fn new_rect(display: &Display, texture_filename: Option<&str>) -> Model {
 
 pub struct Context {
     pub delta: f32,
+    models: HashMap<String, Model>,
     pressed: Vec<KeyCode>,
     display: Display,
-    program: Program,
-    rect: Model,
 }
 
 type EventLoop = glium::glutin::event_loop::EventLoop<()>;
@@ -62,19 +62,12 @@ impl Context {
 
         let display = Display::new(window_builder, context_builder, &event_loop).unwrap();
 
-        let program = Program::from_source(&display, VERTEX_SHADER, FRAGMENT_SHADER, None).unwrap();
-
         Self {
             delta: 0.0,
+            models: HashMap::new(),
             pressed: Vec::new(),
-            rect: new_rect(&display, None),
             display,
-            program,
         }
-    }
-
-    fn new_canvas(&self) -> Canvas {
-        Canvas::new(self.display.draw(), &self.program, &self.rect)
     }
 
     fn press(&mut self, key: KeyCode) {
@@ -104,8 +97,19 @@ impl Context {
         }
     }
 
-    pub fn load_texture(&self, filename: &str) -> Model {
-        new_rect(&self.display, Some(filename))
+    pub fn get_texture(&mut self, filename: &str) -> &Model {
+        if self.models.contains_key(&filename.to_string()) {
+            return self.models.get(&filename.to_string()).unwrap();
+        }
+
+        let model = if filename == "rect" {
+            new_rect(&self.display, None)
+        } else {
+            new_rect(&self.display, Some(&filename))
+        };
+
+        self.models.insert(filename.to_string(), model);
+        self.models.get(&filename.to_string()).unwrap()
     }
 }
 
@@ -122,6 +126,9 @@ pub fn run_game<T: 'static + Game>(game: T) {
     let event_loop = EventLoop::new();
 
     let mut context = Context::new(config, &event_loop);
+
+    let program =
+        Program::from_source(&context.display, VERTEX_SHADER, FRAGMENT_SHADER, None).unwrap();
 
     game.get_mut().unwrap().init(&mut context);
 
@@ -155,8 +162,8 @@ pub fn run_game<T: 'static + Game>(game: T) {
 
         game.get_mut().unwrap().update(&mut context);
 
-        let mut canvas = context.new_canvas();
-        game.get_mut().unwrap().render(&mut canvas);
+        let mut canvas = Canvas::new(context.display.draw(), &program);
+        game.get_mut().unwrap().render(&mut canvas, &mut context);
         canvas.finish();
 
         previous_frame = this_frame;

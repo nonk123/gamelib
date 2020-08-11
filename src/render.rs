@@ -145,7 +145,6 @@ impl Viewport {
 pub struct Canvas<'a> {
     frame: Frame,
     program: &'a Program,
-    rect: &'a Model,
     viewport: Viewport,
 }
 
@@ -153,12 +152,11 @@ type Vec2 = (f32, f32);
 type Color = (f32, f32, f32);
 
 impl<'a> Canvas<'a> {
-    pub fn new(frame: Frame, program: &'a Program, rect: &'a Model) -> Self {
+    pub fn new(frame: Frame, program: &'a Program) -> Self {
         Self {
             viewport: Viewport::stretch((1.0, 1.0)),
             frame,
             program,
-            rect,
         }
     }
 
@@ -193,17 +191,6 @@ impl<'a> Canvas<'a> {
                 &parameters,
             )
             .unwrap();
-    }
-
-    pub fn rect(&mut self, offset: Vec2, scale: Vec2, color: Color) {
-        self.model(self.rect, offset, scale, color);
-    }
-
-    pub fn rect_center(&mut self, offset: Vec2, scale: Vec2, color: Color) {
-        let (x, y) = offset;
-        let (w, h) = scale;
-
-        self.rect((x - w / 2.0, y - h / 2.0), scale, color);
     }
 
     pub fn clear(&mut self, r: f32, g: f32, b: f32) {

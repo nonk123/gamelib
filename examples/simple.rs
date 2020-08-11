@@ -27,7 +27,7 @@ impl Game for Simple {
         }
     }
 
-    fn render(&mut self, canvas: &mut Canvas) {
+    fn render(&mut self, canvas: &mut Canvas, context: &mut Context) {
         let dist = 0.5;
         let size = 0.1;
 
@@ -36,7 +36,12 @@ impl Game for Simple {
 
         canvas.clear(0.0, 0.0, 0.0);
         canvas.fit(1.0, 1.0);
-        canvas.rect_center((x, y), (size, size), (1.0, 0.0, 0.0));
+        canvas.model(
+            context.get_texture("rect"),
+            (x - size / 2.0, y - size / 2.0),
+            (size, size),
+            (1.0, 0.0, 0.0),
+        );
     }
 }
 
