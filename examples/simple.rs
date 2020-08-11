@@ -35,6 +35,7 @@ impl Game for Simple {
         let y = self.angle.sin() * dist;
 
         canvas.clear(0.0, 0.0, 0.0, 1.0);
+        canvas.fit(1.0, 1.0);
         canvas.rect_center((x, y), (size, size), (1.0, 0.0, 0.0));
     }
 }
