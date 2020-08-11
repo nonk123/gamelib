@@ -62,12 +62,25 @@ impl Viewport {
         Self::new(size, ViewportScaling::Fit)
     }
 
+    fn scale(&self, vector: Vec2) -> Vec2 {
+        (vector.0 / self.size.0, vector.1 / self.size.1)
+    }
+
     fn get_dimensions(&self, frame: &Frame) -> Rect {
         let screen_size = frame.get_dimensions();
+
         let smallest_side = cmp::min(screen_size.0, screen_size.1) as f32;
 
         let screen_size = (screen_size.0 as f32, screen_size.1 as f32);
-        let expected_size = ((smallest_side * self.size.0), (smallest_side * self.size.1));
+
+        let screen_ar = screen_size.0 / screen_size.1;
+        let expected_ar = self.size.0 / self.size.1;
+
+        let expected_size = if screen_ar > expected_ar {
+            (smallest_side * expected_ar, smallest_side)
+        } else {
+            (smallest_side, smallest_side * expected_ar)
+        };
 
         let position: (u32, u32) = match self.scaling {
             ViewportScaling::Stretch => (0, 0),
@@ -75,12 +88,9 @@ impl Viewport {
                 let mut h_fringe = 0.0;
                 let mut v_fringe = 0.0;
 
-                let screen_ar = screen_size.0 / screen_size.1;
-                let expected_ar = expected_size.0 / expected_size.1;
-
                 if screen_ar > expected_ar {
                     h_fringe = (screen_size.0 - expected_size.0) / 2.0;
-                } else {
+                } else if screen_ar < expected_ar {
                     v_fringe = (screen_size.1 - expected_size.1) / 2.0;
                 }
 
@@ -94,10 +104,6 @@ impl Viewport {
             width: expected_size.0 as u32,
             height: expected_size.1 as u32,
         }
-    }
-
-    fn scale(&self, vec: Vec2) -> Vec2 {
-        (vec.0 / self.size.0, vec.1 / self.size.1)
     }
 }
 
@@ -164,7 +170,7 @@ impl<'a> Canvas<'a> {
         self.rect((x - w / 2.0, y - h / 2.0), scale, color);
     }
 
-    pub fn clear(&mut self, r: f32, g: f32, b: f32, a: f32) {
-        self.frame.clear_color(r, g, b, a);
+    pub fn clear(&mut self, r: f32, g: f32, b: f32) {
+        self.frame.clear_color(r, g, b, 1.0);
     }
 }
