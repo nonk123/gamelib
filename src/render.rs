@@ -174,3 +174,32 @@ impl<'a> Canvas<'a> {
         self.frame.clear_color(r, g, b, 1.0);
     }
 }
+
+pub const VERTEX_SHADER: &str = "
+#version 140
+
+uniform vec2 offset;
+uniform vec2 scale;
+uniform vec3 color;
+
+in vec2 position;
+
+out vec3 vColor;
+
+void main() {
+    gl_Position = vec4(offset + position * scale, 0.0, 1.0);
+    vColor = color;
+}
+";
+
+pub const FRAGMENT_SHADER: &str = "
+#version 140
+
+in vec3 vColor;
+
+out vec4 f_color;
+
+void main() {
+    f_color = vec4(vColor, 1.0);
+}
+";

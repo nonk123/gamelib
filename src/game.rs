@@ -10,7 +10,7 @@ use glium::{Display, Program};
 use std::sync::Mutex;
 use std::time::Instant;
 
-use crate::render::{Canvas, Model};
+use crate::render::{Canvas, Model, VERTEX_SHADER, FRAGMENT_SHADER};
 
 pub use glium::glutin::event::VirtualKeyCode as KeyCode;
 
@@ -95,35 +95,6 @@ impl Context {
         }
     }
 }
-
-static VERTEX_SHADER: &str = "
-#version 140
-
-uniform vec2 offset;
-uniform vec2 scale;
-uniform vec3 color;
-
-in vec2 position;
-
-out vec3 vColor;
-
-void main() {
-    gl_Position = vec4(offset + position * scale, 0.0, 1.0);
-    vColor = color;
-}
-";
-
-static FRAGMENT_SHADER: &str = "
-#version 140
-
-in vec3 vColor;
-
-out vec4 f_color;
-
-void main() {
-    f_color = vec4(vColor, 1.0);
-}
-";
 
 pub fn run_game<T: 'static + Game>(game: T) {
     let mut game = Mutex::new(game);
