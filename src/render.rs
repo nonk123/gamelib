@@ -1,5 +1,9 @@
 use glium::index::PrimitiveType;
 
+use glium::texture::{
+    CompressedMipmapsOption, CompressedSrgbFormat, CompressedSrgbTexture2d, RawImage2d,
+};
+
 use glium::{Display, DrawParameters, Frame, Program, Rect, Surface};
 
 use std::cmp;
@@ -7,13 +11,17 @@ use std::cmp;
 #[derive(Copy, Clone)]
 struct Vertex {
     position: (f32, f32),
+    tex_coords: (f32, f32),
 }
 
-implement_vertex!(Vertex, position);
+implement_vertex!(Vertex, position, tex_coords);
 
 impl Vertex {
-    fn new(x: f32, y: f32) -> Self {
-        Self { position: (x, y) }
+    fn new(x: f32, y: f32, tx: f32, ty: f32) -> Self {
+        Self {
+            position: (x, y),
+            tex_coords: (tx, ty),
+        }
     }
 }
 
@@ -23,18 +31,45 @@ type IndexBuffer = glium::IndexBuffer<u16>;
 pub struct Model {
     vertex_buffer: VertexBuffer,
     index_buffer: IndexBuffer,
+    texture: CompressedSrgbTexture2d,
 }
 
 impl Model {
-    pub fn new(display: &Display, vertices: &[(f32, f32)], indices: &[u16]) -> Self {
+    pub fn new(
+        display: &Display,
+        vertices: &[(f32, f32, f32, f32)],
+        indices: &[u16],
+        texture_filename: Option<&str>,
+    ) -> Self {
         let vertices: Vec<_> = vertices
             .iter()
-            .map(|points| Vertex::new(points.0, points.1))
+            .map(|points| Vertex::new(points.0, points.1, points.2, points.3))
             .collect();
 
         Self {
             vertex_buffer: VertexBuffer::new(display, &vertices).unwrap(),
             index_buffer: IndexBuffer::new(display, PrimitiveType::TriangleStrip, indices).unwrap(),
+            texture: match texture_filename {
+                Some(filename) => {
+                    let image = image::open(&filename)
+                        .expect(format!("Couldn't load image {}", filename).as_str())
+                        .to_rgba();
+
+                    let dimensions = image.dimensions();
+
+                    let image = RawImage2d::from_raw_rgba_reversed(&image.into_raw(), dimensions);
+
+                    CompressedSrgbTexture2d::new(display, image).unwrap()
+                }
+                None => CompressedSrgbTexture2d::empty_with_format(
+                    display,
+                    CompressedSrgbFormat::S3tcDxt1Alpha,
+                    CompressedMipmapsOption::NoMipmap,
+                    1,
+                    1,
+                )
+                .unwrap(),
+            },
         }
     }
 }
@@ -140,7 +175,7 @@ impl<'a> Canvas<'a> {
         self.viewport = Viewport::fit((width, height));
     }
 
-    fn draw_model(&mut self, model: &Model, offset: Vec2, scale: Vec2, color: Color) {
+    pub fn model(&mut self, model: &Model, offset: Vec2, scale: Vec2, color: Color) {
         let mut parameters = DrawParameters::default();
         parameters.viewport = Some(self.viewport.get_dimensions(&self.frame));
 
@@ -153,6 +188,7 @@ impl<'a> Canvas<'a> {
                     offset: self.viewport.scale(offset),
                     scale: self.viewport.scale(scale),
                     color: color,
+                    tex: &model.texture,
                 },
                 &parameters,
             )
@@ -160,7 +196,7 @@ impl<'a> Canvas<'a> {
     }
 
     pub fn rect(&mut self, offset: Vec2, scale: Vec2, color: Color) {
-        self.draw_model(self.rect, offset, scale, color);
+        self.model(self.rect, offset, scale, color);
     }
 
     pub fn rect_center(&mut self, offset: Vec2, scale: Vec2, color: Color) {
@@ -183,23 +219,35 @@ uniform vec2 scale;
 uniform vec3 color;
 
 in vec2 position;
+in vec2 tex_coords;
 
-out vec3 vColor;
+out vec3 v_color;
+out vec2 v_tex_coords;
 
 void main() {
     gl_Position = vec4(offset + position * scale, 0.0, 1.0);
-    vColor = color;
+    v_color = color;
+    v_tex_coords = tex_coords;
 }
 ";
 
 pub const FRAGMENT_SHADER: &str = "
 #version 140
 
-in vec3 vColor;
+uniform sampler2D tex;
+
+in vec3 v_color;
+in vec2 v_tex_coords;
 
 out vec4 f_color;
 
 void main() {
-    f_color = vec4(vColor, 1.0);
+    // Use solid color instead of dummy 1x1 texture.
+    if (textureSize(tex, 0) == vec2(1, 1)) {
+        f_color = vec4(v_color, 1.0);
+    } else {
+        vec4 t_color = texture(tex, v_tex_coords);
+        f_color = mix(t_color, vec4(v_color, 1.0), 0.5);
+    }
 }
 ";

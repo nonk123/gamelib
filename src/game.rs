@@ -10,7 +10,7 @@ use glium::{Display, Program};
 use std::sync::Mutex;
 use std::time::Instant;
 
-use crate::render::{Canvas, Model, VERTEX_SHADER, FRAGMENT_SHADER};
+use crate::render::{Canvas, Model, FRAGMENT_SHADER, VERTEX_SHADER};
 
 pub use glium::glutin::event::VirtualKeyCode as KeyCode;
 
@@ -21,8 +21,23 @@ pub struct GameConfig {
 
 pub trait Game {
     fn configure(&self, _config: &mut GameConfig) {}
-    fn render(&mut self, canvas: &mut Canvas);
-    fn update(&mut self, context: &mut Context);
+    fn init(&mut self, _context: &mut Context) {}
+    fn render(&mut self, _canvas: &mut Canvas) {}
+    fn update(&mut self, _context: &mut Context) {}
+}
+
+fn new_rect(display: &Display, texture_filename: Option<&str>) -> Model {
+    Model::new(
+        &display,
+        &[
+            (0.0, 0.0, 0.0, 0.0),
+            (1.0, 0.0, 1.0, 0.0),
+            (1.0, 1.0, 1.0, 1.0),
+            (0.0, 1.0, 0.0, 1.0),
+        ],
+        &[0, 1, 3, 2],
+        texture_filename,
+    )
 }
 
 pub struct Context {
@@ -49,18 +64,12 @@ impl Context {
 
         let program = Program::from_source(&display, VERTEX_SHADER, FRAGMENT_SHADER, None).unwrap();
 
-        let rect = Model::new(
-            &display,
-            &[(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)],
-            &[0, 1, 3, 2],
-        );
-
         Self {
             delta: 0.0,
             pressed: Vec::new(),
+            rect: new_rect(&display, None),
             display,
             program,
-            rect,
         }
     }
 
@@ -94,6 +103,10 @@ impl Context {
             false
         }
     }
+
+    pub fn load_texture(&self, filename: &str) -> Model {
+        new_rect(&self.display, Some(filename))
+    }
 }
 
 pub fn run_game<T: 'static + Game>(game: T) {
@@ -109,6 +122,8 @@ pub fn run_game<T: 'static + Game>(game: T) {
     let event_loop = EventLoop::new();
 
     let mut context = Context::new(config, &event_loop);
+
+    game.get_mut().unwrap().init(&mut context);
 
     let mut previous_frame = Instant::now();
 
