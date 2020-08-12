@@ -80,21 +80,26 @@ enum ViewportScaling {
 }
 
 pub struct Viewport {
-    size: (f32, f32),
+    width: f32,
+    height: f32,
     scaling: ViewportScaling,
 }
 
 impl Viewport {
-    fn new(size: (f32, f32), scaling: ViewportScaling) -> Self {
-        Self { size, scaling }
+    fn new(width: f32, height: f32, scaling: ViewportScaling) -> Self {
+        Self {
+            width,
+            height,
+            scaling,
+        }
     }
 
-    pub fn stretch(size: (f32, f32)) -> Self {
-        Self::new(size, ViewportScaling::Stretch)
+    pub fn stretch(width: f32, height: f32) -> Self {
+        Self::new(width, height, ViewportScaling::Stretch)
     }
 
-    pub fn fit(size: (f32, f32)) -> Self {
-        Self::new(size, ViewportScaling::Fit)
+    pub fn fit(width: f32, height: f32) -> Self {
+        Self::new(width, height, ViewportScaling::Fit)
     }
 
     fn get_dimensions(&self, frame: &Frame) -> Rect {
@@ -105,7 +110,7 @@ impl Viewport {
         let screen_size = (screen_size.0 as f32, screen_size.1 as f32);
 
         let screen_ar = screen_size.0 / screen_size.1;
-        let expected_ar = self.size.0 / self.size.1;
+        let expected_ar = self.width / self.height;
 
         let expected_size = if screen_ar > expected_ar {
             (smallest_side * expected_ar, smallest_side)
@@ -139,14 +144,13 @@ impl Viewport {
 }
 
 pub struct Camera {
-    position: Vec2,
+    x: f32,
+    y: f32,
 }
 
 impl Camera {
     fn new() -> Self {
-        Self {
-            position: (0.0, 0.0),
-        }
+        Self { x: 0.0, y: 0.0 }
     }
 }
 
@@ -163,7 +167,7 @@ type Color = (f32, f32, f32);
 impl<'a> Canvas<'a> {
     pub fn new(frame: Frame, program: &'a Program) -> Self {
         Self {
-            viewport: Viewport::stretch((1.0, 1.0)),
+            viewport: Viewport::stretch(1.0, 1.0),
             camera: Camera::new(),
             frame,
             program,
@@ -176,11 +180,16 @@ impl<'a> Canvas<'a> {
     }
 
     pub fn stretch(&mut self, width: f32, height: f32) {
-        self.viewport = Viewport::stretch((width, height));
+        self.viewport = Viewport::stretch(width, height);
     }
 
     pub fn fit(&mut self, width: f32, height: f32) {
-        self.viewport = Viewport::fit((width, height));
+        self.viewport = Viewport::fit(width, height);
+    }
+
+    pub fn look_at(&mut self, x: f32, y: f32) {
+        self.camera.x = x;
+        self.camera.y = y;
     }
 
     pub fn model(&mut self, model: &Model, offset: Vec2, scale: Vec2, color: Color) {
@@ -203,9 +212,16 @@ impl<'a> Canvas<'a> {
             c
         };
 
+        let projection_matrix = [
+            [1.0 / self.viewport.width, 0.0, 0.0, 0.0],
+            [0.0, 1.0 / self.viewport.height, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+
         let view_matrix = [
-            [1.0 / self.viewport.size.0, 0.0, 0.0, self.camera.position.0],
-            [0.0, 1.0 / self.viewport.size.1, 0.0, self.camera.position.1],
+            [1.0, 0.0, 0.0, -self.camera.x],
+            [0.0, 1.0, 0.0, -self.camera.y],
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
         ];
@@ -217,13 +233,16 @@ impl<'a> Canvas<'a> {
             [0.0, 0.0, 0.0, 1.0],
         ];
 
+        let mvp = mult(projection_matrix, view_matrix);
+        let mvp = mult(mvp, model_matrix);
+
         self.frame
             .draw(
                 &model.vertex_buffer,
                 &model.index_buffer,
                 &self.program,
                 &uniform! {
-                    mvp: mult(view_matrix, model_matrix),
+                    mvp: mvp,
                     color: color,
                     tex: &model.texture,
                 },
