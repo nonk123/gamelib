@@ -39,7 +39,7 @@ impl Model {
         display: &Display,
         vertices: &[(f32, f32, f32, f32)],
         indices: &[u16],
-        texture_filename: Option<&str>,
+        texture: Option<&str>,
     ) -> Self {
         let vertices: Vec<_> = vertices
             .iter()
@@ -49,7 +49,7 @@ impl Model {
         Self {
             vertex_buffer: VertexBuffer::new(display, &vertices).unwrap(),
             index_buffer: IndexBuffer::new(display, PrimitiveType::TriangleStrip, indices).unwrap(),
-            texture: match texture_filename {
+            texture: match texture {
                 Some(filename) => {
                     let image = image::open(&filename)
                         .expect(format!("Couldn't load image {}", filename).as_str())
@@ -97,10 +97,6 @@ impl Viewport {
         Self::new(size, ViewportScaling::Fit)
     }
 
-    fn scale(&self, vector: Vec2) -> Vec2 {
-        (vector.0 / self.size.0, vector.1 / self.size.1)
-    }
-
     fn get_dimensions(&self, frame: &Frame) -> Rect {
         let screen_size = frame.get_dimensions();
 
@@ -142,10 +138,23 @@ impl Viewport {
     }
 }
 
+pub struct Camera {
+    position: Vec2,
+}
+
+impl Camera {
+    fn new() -> Self {
+        Self {
+            position: (0.0, 0.0),
+        }
+    }
+}
+
 pub struct Canvas<'a> {
     frame: Frame,
     program: &'a Program,
     viewport: Viewport,
+    camera: Camera,
 }
 
 type Vec2 = (f32, f32);
@@ -155,6 +164,7 @@ impl<'a> Canvas<'a> {
     pub fn new(frame: Frame, program: &'a Program) -> Self {
         Self {
             viewport: Viewport::stretch((1.0, 1.0)),
+            camera: Camera::new(),
             frame,
             program,
         }
@@ -177,14 +187,43 @@ impl<'a> Canvas<'a> {
         let mut parameters = DrawParameters::default();
         parameters.viewport = Some(self.viewport.get_dimensions(&self.frame));
 
+        let mult = |a: [[f32; 4]; 4], b: [[f32; 4]; 4]| {
+            let mut c = a;
+
+            for i in 0..4 {
+                for j in 0..4 {
+                    c[i][j] = 0.0;
+
+                    for n in 0..4 {
+                        c[i][j] += a[i][n] * b[n][j];
+                    }
+                }
+            }
+
+            c
+        };
+
+        let view_matrix = [
+            [1.0 / self.viewport.size.0, 0.0, 0.0, self.camera.position.0],
+            [0.0, 1.0 / self.viewport.size.1, 0.0, self.camera.position.1],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+
+        let model_matrix = [
+            [scale.0, 0.0, 0.0, offset.0],
+            [0.0, scale.1, 0.0, offset.1],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+
         self.frame
             .draw(
                 &model.vertex_buffer,
                 &model.index_buffer,
                 &self.program,
                 &uniform! {
-                    offset: self.viewport.scale(offset),
-                    scale: self.viewport.scale(scale),
+                    mvp: mult(view_matrix, model_matrix),
                     color: color,
                     tex: &model.texture,
                 },
@@ -201,8 +240,7 @@ impl<'a> Canvas<'a> {
 pub const VERTEX_SHADER: &str = "
 #version 140
 
-uniform vec2 offset;
-uniform vec2 scale;
+uniform mat4 mvp;
 uniform vec3 color;
 
 in vec2 position;
@@ -212,7 +250,7 @@ out vec3 v_color;
 out vec2 v_tex_coords;
 
 void main() {
-    gl_Position = vec4(offset + position * scale, 0.0, 1.0);
+    gl_Position = vec4(position, 0.0, 1.0) * mvp;
     v_color = color;
     v_tex_coords = tex_coords;
 }

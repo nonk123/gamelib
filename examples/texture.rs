@@ -7,7 +7,7 @@ impl Game for Texture {
         canvas.clear(0.1, 0.1, 0.1);
         canvas.fit(1.0, 1.0);
         canvas.model(
-            context.get_texture("examples/textures/ch.png"),
+            context.get_sprite("examples/textures/ch.png"),
             (-0.5, -0.5),
             (1.0, 1.0),
             (0.0, 0.0, 0.0),

@@ -19,7 +19,7 @@ impl Game for Viewport {
 
         let mut rect = |x: f32, y: f32| {
             canvas.model(
-                context.get_texture("rect"),
+                context.get_sprite("rect"),
                 (x, y),
                 (1.0, 1.0),
                 colors.pop().unwrap(),

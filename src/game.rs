@@ -28,7 +28,7 @@ pub trait Game {
     fn update(&mut self, _context: &mut Context) {}
 }
 
-fn new_rect(display: &Display, texture_filename: Option<&str>) -> Model {
+fn new_rect(display: &Display, texture: Option<&str>) -> Model {
     Model::new(
         &display,
         &[
@@ -38,7 +38,7 @@ fn new_rect(display: &Display, texture_filename: Option<&str>) -> Model {
             (0.0, 1.0, 0.0, 1.0),
         ],
         &[0, 1, 3, 2],
-        texture_filename,
+        texture,
     )
 }
 
@@ -89,7 +89,7 @@ impl Context {
         held
     }
 
-    pub fn get_texture(&mut self, filename: &str) -> &Model {
+    pub fn get_sprite(&mut self, filename: &str) -> &Model {
         if self.models.contains_key(&filename.to_string()) {
             return self.models.get(&filename.to_string()).unwrap();
         }

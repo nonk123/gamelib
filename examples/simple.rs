@@ -37,7 +37,7 @@ impl Game for Simple {
         canvas.clear(0.0, 0.0, 0.0);
         canvas.fit(1.0, 1.0);
         canvas.model(
-            context.get_texture("rect"),
+            context.get_sprite("rect"),
             (x - size / 2.0, y - size / 2.0),
             (size, size),
             (1.0, 0.0, 0.0),
