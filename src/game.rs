@@ -7,7 +7,7 @@ use glium::glutin::event::{ElementState, Event, WindowEvent};
 
 use glium::{Display, Program};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::time::Instant;
 
@@ -18,6 +18,7 @@ pub use glium::glutin::event::VirtualKeyCode as KeyCode;
 pub struct GameConfig {
     pub title: String,
     pub window_size: (u32, u32),
+    pub update_fps: f32,
 }
 
 pub trait Game {
@@ -44,42 +45,38 @@ fn new_rect(display: &Display, texture_filename: Option<&str>) -> Model {
 pub struct Context {
     pub delta: f32,
     models: HashMap<String, Model>,
-    pressed: Vec<KeyCode>,
+    pressed: HashSet<KeyCode>,
     display: Display,
 }
 
 type EventLoop = glium::glutin::event_loop::EventLoop<()>;
 
 impl Context {
-    fn new(config: GameConfig, event_loop: &EventLoop) -> Self {
+    fn new(config: &GameConfig, event_loop: &EventLoop) -> Self {
         let (width, height) = config.window_size;
 
         let window_builder = WindowBuilder::new()
             .with_inner_size(LogicalSize::new(width, height))
-            .with_title(config.title);
+            .with_title(config.title.to_string());
 
-        let context_builder = ContextBuilder::new().with_vsync(true);
+        let context_builder = ContextBuilder::new();
 
         let display = Display::new(window_builder, context_builder, &event_loop).unwrap();
 
         Self {
             delta: 0.0,
             models: HashMap::new(),
-            pressed: Vec::new(),
+            pressed: HashSet::new(),
             display,
         }
     }
 
     fn press(&mut self, key: KeyCode) {
-        self.pressed.push(key);
+        self.pressed.insert(key);
     }
 
     fn release(&mut self, key: KeyCode) {
-        let index = self.pressed.binary_search(&key);
-
-        if let Ok(index) = index {
-            self.pressed.remove(index);
-        }
+        self.pressed.remove(&key);
     }
 
     pub fn is_held(&self, key: KeyCode) -> bool {
@@ -88,13 +85,8 @@ impl Context {
 
     pub fn was_pressed(&mut self, key: KeyCode) -> bool {
         let held = self.is_held(key);
-
-        if held {
-            self.release(key);
-            true
-        } else {
-            false
-        }
+        self.release(key);
+        held
     }
 
     pub fn get_texture(&mut self, filename: &str) -> &Model {
@@ -119,13 +111,15 @@ pub fn run_game<T: 'static + Game>(game: T) {
     let mut config = GameConfig {
         title: "My Game".into(),
         window_size: (640, 420),
+        update_fps: 24.0,
     };
 
     game.get_mut().unwrap().configure(&mut config);
 
     let event_loop = EventLoop::new();
 
-    let mut context = Context::new(config, &event_loop);
+    let mut context = Context::new(&config, &event_loop);
+    context.delta = 1.0 / config.update_fps;
 
     let program =
         Program::from_source(&context.display, VERTEX_SHADER, FRAGMENT_SHADER, None).unwrap();
@@ -157,15 +151,16 @@ pub fn run_game<T: 'static + Game>(game: T) {
         }
 
         let this_frame = Instant::now();
+        let mut catchup = this_frame.duration_since(previous_frame).as_secs_f32();
 
-        context.delta = this_frame.duration_since(previous_frame).as_secs_f32();
-
-        game.get_mut().unwrap().update(&mut context);
+        while catchup > context.delta {
+            game.get_mut().unwrap().update(&mut context);
+            catchup -= context.delta;
+            previous_frame = this_frame;
+        }
 
         let mut canvas = Canvas::new(context.display.draw(), &program);
         game.get_mut().unwrap().render(&mut canvas, &mut context);
         canvas.finish();
-
-        previous_frame = this_frame;
     });
 }
