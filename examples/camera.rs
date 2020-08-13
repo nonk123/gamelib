@@ -31,7 +31,7 @@ impl Game for Camera {
     }
 
     fn render(&mut self, canvas: &mut Canvas, context: &mut Context) {
-        let positions = vec![(-1.0, -1.0), (0.0, -1.0), (0.0, 1.0), (-1.0, 0.0)];
+        let positions = vec![(-1.0, -1.0), (0.0, -1.0), (0.0, 0.0), (-1.0, 0.0)];
 
         let colors = vec![
             (1.0, 0.0, 0.0),
@@ -44,15 +44,14 @@ impl Game for Camera {
         canvas.fit(0.5, 0.5);
 
         let (x, y) = positions[self.camera_index];
-        canvas.look_at(x + 0.5, y + 0.5);
+        canvas.look_at(x, y);
 
         for i in 0..4 {
-            canvas.model(
-                context.get_sprite("rect"),
-                positions[i],
-                (1.0, 1.0),
-                colors[i],
-            );
+            context
+                .render("rect")
+                .translate_tup(positions[i])
+                .shade_tup(colors[i])
+                .commit(canvas);
         }
     }
 }

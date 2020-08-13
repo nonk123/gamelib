@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::time::Instant;
 
-use crate::render::{Canvas, Model, FRAGMENT_SHADER, VERTEX_SHADER};
+use crate::render::{Canvas, Model, ModelRenderBuilder, FRAGMENT_SHADER, VERTEX_SHADER};
 
 pub use glium::glutin::event::VirtualKeyCode as KeyCode;
 
@@ -32,10 +32,10 @@ fn new_rect(display: &Display, texture: Option<&str>) -> Model {
     Model::new(
         &display,
         &[
-            (0.0, 0.0, 0.0, 0.0),
-            (1.0, 0.0, 1.0, 0.0),
-            (1.0, 1.0, 1.0, 1.0),
-            (0.0, 1.0, 0.0, 1.0),
+            (-0.5, -0.5, 0.0, 0.0),
+            (0.5, -0.5, 1.0, 0.0),
+            (0.5, 0.5, 1.0, 1.0),
+            (-0.5, 0.5, 0.0, 1.0),
         ],
         &[0, 1, 3, 2],
         texture,
@@ -102,6 +102,10 @@ impl Context {
 
         self.models.insert(filename.to_string(), model);
         self.models.get(&filename.to_string()).unwrap()
+    }
+
+    pub fn render(&mut self, filename: &str) -> ModelRenderBuilder {
+        ModelRenderBuilder::new(self.get_sprite(filename))
     }
 }
 

@@ -154,15 +154,73 @@ impl Camera {
     }
 }
 
+type Vec2 = (f32, f32);
+type Color = (f32, f32, f32);
+
+pub struct ModelRenderBuilder<'a> {
+    model: &'a Model,
+    position: Vec2,
+    scale: Vec2,
+    rotation: f32,
+    color: Color,
+}
+
+impl<'a> ModelRenderBuilder<'a> {
+    pub fn new(model: &'a Model) -> Self {
+        Self {
+            model,
+            position: (0.0, 0.0),
+            scale: (1.0, 1.0),
+            rotation: 0.0,
+            color: (0.0, 0.0, 0.0),
+        }
+    }
+
+    pub fn translate(mut self, dx: f32, dy: f32) -> Self {
+        self.position.0 += dx;
+        self.position.1 += dy;
+        self
+    }
+
+    pub fn translate_tup(self, (dx, dy): (f32, f32)) -> Self {
+        self.translate(dx, dy)
+    }
+
+    pub fn scale(mut self, x_mult: f32, y_mult: f32) -> Self {
+        self.scale.0 *= x_mult;
+        self.scale.1 *= y_mult;
+        self
+    }
+
+    pub fn scale_tup(self, (x_mult, y_mult): (f32, f32)) -> Self {
+        self.scale(x_mult, y_mult)
+    }
+
+    pub fn rotate(mut self, by_rad: f32) -> Self {
+        self.rotation += by_rad;
+        self
+    }
+
+    pub fn shade(mut self, red: f32, green: f32, blue: f32) -> Self {
+        self.color = (red, green, blue);
+        self
+    }
+
+    pub fn shade_tup(self, (red, green, blue): (f32, f32, f32)) -> Self {
+        self.shade(red, green, blue)
+    }
+
+    pub fn commit(self, canvas: &mut Canvas) {
+        canvas.render_model_from_builder(self);
+    }
+}
+
 pub struct Canvas<'a> {
     frame: Frame,
     program: &'a Program,
     viewport: Viewport,
     camera: Camera,
 }
-
-type Vec2 = (f32, f32);
-type Color = (f32, f32, f32);
 
 impl<'a> Canvas<'a> {
     pub fn new(frame: Frame, program: &'a Program) -> Self {
@@ -192,7 +250,7 @@ impl<'a> Canvas<'a> {
         self.camera.y = y;
     }
 
-    pub fn model(&mut self, model: &Model, offset: Vec2, scale: Vec2, color: Color) {
+    pub fn render_model_from_builder(&mut self, renderer: ModelRenderBuilder) {
         let mut parameters = DrawParameters::default();
         parameters.viewport = Some(self.viewport.get_dimensions(&self.frame));
 
@@ -226,25 +284,42 @@ impl<'a> Canvas<'a> {
             [0.0, 0.0, 0.0, 1.0],
         ];
 
-        let model_matrix = [
-            [scale.0, 0.0, 0.0, offset.0],
-            [0.0, scale.1, 0.0, offset.1],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ];
+        let model_matrix = {
+            let translation = [
+                [1.0, 0.0, 0.0, renderer.position.0],
+                [0.0, 1.0, 0.0, renderer.position.1],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ];
 
-        let mvp = mult(projection_matrix, view_matrix);
-        let mvp = mult(mvp, model_matrix);
+            let rotation = [
+                [renderer.rotation.cos(), -renderer.rotation.sin(), 0.0, 0.0],
+                [renderer.rotation.sin(), renderer.rotation.cos(), 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ];
+
+            let scale = [
+                [renderer.scale.0, 0.0, 0.0, 0.0],
+                [0.0, renderer.scale.1, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ];
+
+            mult(mult(translation, rotation), scale)
+        };
+
+        let mvp = mult(mult(projection_matrix, view_matrix), model_matrix);
 
         self.frame
             .draw(
-                &model.vertex_buffer,
-                &model.index_buffer,
+                &renderer.model.vertex_buffer,
+                &renderer.model.index_buffer,
                 &self.program,
                 &uniform! {
                     mvp: mvp,
-                    color: color,
-                    tex: &model.texture,
+                    color: renderer.color,
+                    tex: &renderer.model.texture,
                 },
                 &parameters,
             )

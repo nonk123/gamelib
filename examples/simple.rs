@@ -29,19 +29,20 @@ impl Game for Simple {
 
     fn render(&mut self, canvas: &mut Canvas, context: &mut Context) {
         let dist = 0.5;
-        let size = 0.1;
+        let size = 0.15;
 
         let x = self.angle.cos() * dist;
         let y = self.angle.sin() * dist;
 
         canvas.clear(0.0, 0.0, 0.0);
         canvas.fit(1.0, 1.0);
-        canvas.model(
-            context.get_sprite("rect"),
-            (x - size / 2.0, y - size / 2.0),
-            (size, size),
-            (1.0, 0.0, 0.0),
-        );
+        context
+            .render("rect")
+            .translate(x - size / 2.0, y - size / 2.0)
+            .scale(size, size)
+            .rotate(self.angle)
+            .shade(1.0, 0.0, 0.0)
+            .commit(canvas)
     }
 }
 

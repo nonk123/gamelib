@@ -18,18 +18,17 @@ impl Game for Viewport {
         colors.reverse();
 
         let mut rect = |x: f32, y: f32| {
-            canvas.model(
-                context.get_sprite("rect"),
-                (x, y),
-                (1.0, 1.0),
-                colors.pop().unwrap(),
-            );
+            context
+                .render("rect")
+                .translate(x, y)
+                .shade_tup(colors.pop().unwrap())
+                .commit(canvas);
         };
 
-        rect(-1.0, -1.0);
-        rect(0.0, -1.0);
-        rect(-1.0, 0.0);
-        rect(0.0, 0.0);
+        rect(-0.5, -0.5);
+        rect(0.5, -0.5);
+        rect(-0.5, 0.5);
+        rect(0.5, 0.5);
     }
 }
 
