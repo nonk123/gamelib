@@ -8,7 +8,7 @@ use glium::{Display, DrawParameters, Frame, Program, Rect, Surface};
 
 use std::cmp;
 
-use crate::game::{Vec2, Color, Mat4};
+use crate::game::{Color, Mat4, Vec2};
 
 #[derive(Copy, Clone)]
 struct Vertex {
@@ -73,6 +73,21 @@ impl Model {
                 .unwrap(),
             },
         }
+    }
+
+    /// Mostly for internal use; `Context::get_sprite` manages these for you.
+    pub fn square(display: &Display, texture: Option<&str>) -> Self {
+        Self::new(
+            display,
+            &[
+                (-0.5, -0.5, 0.0, 0.0),
+                (0.5, -0.5, 1.0, 0.0),
+                (0.5, 0.5, 1.0, 1.0),
+                (-0.5, 0.5, 0.0, 1.0),
+            ],
+            &[0, 1, 3, 2],
+            texture,
+        )
     }
 }
 
