@@ -8,6 +8,8 @@ use glium::{Display, DrawParameters, Frame, Program, Rect, Surface};
 
 use std::cmp;
 
+use crate::game::{Vec2, Color, Mat4};
+
 #[derive(Copy, Clone)]
 struct Vertex {
     position: (f32, f32),
@@ -154,9 +156,6 @@ impl Camera {
     }
 }
 
-type Vec2 = (f32, f32);
-type Color = (f32, f32, f32);
-
 pub struct ModelRenderBuilder<'a> {
     model: &'a Model,
     position: Vec2,
@@ -213,6 +212,31 @@ impl<'a> ModelRenderBuilder<'a> {
     pub fn commit(self, canvas: &mut Canvas) {
         canvas.render_model_from_builder(self);
     }
+
+    fn get_model_matrix(&self) -> Mat4 {
+        let translation = Mat4([
+            [1.0, 0.0, 0.0, self.position.0],
+            [0.0, 1.0, 0.0, self.position.1],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+
+        let rotation = Mat4([
+            [self.rotation.cos(), -self.rotation.sin(), 0.0, 0.0],
+            [self.rotation.sin(), self.rotation.cos(), 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+
+        let scale = Mat4([
+            [self.scale.0, 0.0, 0.0, 0.0],
+            [0.0, self.scale.1, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+
+        translation * rotation * scale
+    }
 }
 
 pub struct Canvas<'a> {
@@ -254,62 +278,23 @@ impl<'a> Canvas<'a> {
         let mut parameters = DrawParameters::default();
         parameters.viewport = Some(self.viewport.get_dimensions(&self.frame));
 
-        let mult = |a: [[f32; 4]; 4], b: [[f32; 4]; 4]| {
-            let mut c = a;
-
-            for i in 0..4 {
-                for j in 0..4 {
-                    c[i][j] = 0.0;
-
-                    for n in 0..4 {
-                        c[i][j] += a[i][n] * b[n][j];
-                    }
-                }
-            }
-
-            c
-        };
-
-        let projection_matrix = [
+        // Scale to match the viewport's size.
+        let projection_matrix = Mat4([
             [1.0 / self.viewport.width, 0.0, 0.0, 0.0],
             [0.0, 1.0 / self.viewport.height, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
-        ];
+        ]);
 
-        let view_matrix = [
+        // Translate away from camera.
+        let view_matrix = Mat4([
             [1.0, 0.0, 0.0, -self.camera.x],
             [0.0, 1.0, 0.0, -self.camera.y],
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
-        ];
+        ]);
 
-        let model_matrix = {
-            let translation = [
-                [1.0, 0.0, 0.0, renderer.position.0],
-                [0.0, 1.0, 0.0, renderer.position.1],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ];
-
-            let rotation = [
-                [renderer.rotation.cos(), -renderer.rotation.sin(), 0.0, 0.0],
-                [renderer.rotation.sin(), renderer.rotation.cos(), 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ];
-
-            let scale = [
-                [renderer.scale.0, 0.0, 0.0, 0.0],
-                [0.0, renderer.scale.1, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ];
-
-            mult(mult(translation, rotation), scale)
-        };
-
-        let mvp = mult(mult(projection_matrix, view_matrix), model_matrix);
+        let mvp = projection_matrix * view_matrix * renderer.get_model_matrix();
 
         self.frame
             .draw(
