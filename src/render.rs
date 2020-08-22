@@ -8,7 +8,7 @@ use glium::{Display, DrawParameters, Frame, Program, Rect, Surface};
 
 use std::cmp;
 
-use crate::game::{Color, Mat4, Vec2};
+use crate::utils::{Color, Mat4, Vec2};
 
 #[derive(Copy, Clone)]
 struct Vertex {
@@ -103,20 +103,12 @@ pub struct Viewport {
 }
 
 impl Viewport {
-    fn new(width: f32, height: f32, scaling: ViewportScaling) -> Self {
+    fn new() -> Self {
         Self {
-            width,
-            height,
-            scaling,
+            scaling: ViewportScaling::Stretch,
+            width: 1.0,
+            height: 1.0,
         }
-    }
-
-    pub fn stretch(width: f32, height: f32) -> Self {
-        Self::new(width, height, ViewportScaling::Stretch)
-    }
-
-    pub fn fit(width: f32, height: f32) -> Self {
-        Self::new(width, height, ViewportScaling::Fit)
     }
 
     fn get_dimensions(&self, frame: &Frame) -> Rect {
@@ -254,18 +246,25 @@ impl<'a> ModelRenderBuilder<'a> {
     }
 }
 
+enum CoordinatesOrigin {
+    Center,
+    BottomLeft,
+}
+
 pub struct Canvas<'a> {
     frame: Frame,
     program: &'a Program,
     viewport: Viewport,
     camera: Camera,
+    origin: CoordinatesOrigin,
 }
 
 impl<'a> Canvas<'a> {
     pub fn new(frame: Frame, program: &'a Program) -> Self {
         Self {
-            viewport: Viewport::stretch(1.0, 1.0),
+            viewport: Viewport::new(),
             camera: Camera::new(),
+            origin: CoordinatesOrigin::Center,
             frame,
             program,
         }
@@ -276,12 +275,17 @@ impl<'a> Canvas<'a> {
         self.frame.finish().unwrap();
     }
 
-    pub fn stretch(&mut self, width: f32, height: f32) {
-        self.viewport = Viewport::stretch(width, height);
+    pub fn size(&mut self, width: f32, height: f32) {
+        self.viewport.width = width;
+        self.viewport.height = height;
     }
 
-    pub fn fit(&mut self, width: f32, height: f32) {
-        self.viewport = Viewport::fit(width, height);
+    pub fn stretch(&mut self) {
+        self.viewport.scaling = ViewportScaling::Stretch;
+    }
+
+    pub fn fit(&mut self) {
+        self.viewport.scaling = ViewportScaling::Fit;
     }
 
     pub fn look_at(&mut self, x: f32, y: f32) {
@@ -289,27 +293,59 @@ impl<'a> Canvas<'a> {
         self.camera.y = y;
     }
 
+    pub fn center(&mut self) {
+        self.origin = CoordinatesOrigin::Center;
+    }
+
+    pub fn bottom_left(&mut self) {
+        self.origin = CoordinatesOrigin::BottomLeft;
+    }
+
     pub fn render_model_from_builder(&mut self, renderer: ModelRenderBuilder) {
         let mut parameters = DrawParameters::default();
         parameters.viewport = Some(self.viewport.get_dimensions(&self.frame));
 
-        // Scale to match the viewport's size.
-        let projection_matrix = Mat4([
-            [1.0 / self.viewport.width, 0.0, 0.0, 0.0],
-            [0.0, 1.0 / self.viewport.height, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]);
+        let projection = {
+            let scale = Mat4([
+                [1.0 / self.viewport.width, 0.0, 0.0, 0.0],
+                [0.0, 1.0 / self.viewport.height, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]);
 
-        // Translate away from camera.
-        let view_matrix = Mat4([
+            let adjustment = match self.origin {
+                CoordinatesOrigin::Center => Mat4::identity(),
+                CoordinatesOrigin::BottomLeft => Mat4([
+                    [2.0, 0.0, 0.0, 0.0],
+                    [0.0, 2.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                    [0.0, 0.0, 0.0, 1.0],
+                ]),
+            };
+
+            adjustment * scale
+        };
+
+        let view = Mat4([
             [1.0, 0.0, 0.0, -self.camera.x],
             [0.0, 1.0, 0.0, -self.camera.y],
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
         ]);
 
-        let mvp = projection_matrix * view_matrix * renderer.get_model_matrix();
+        let adjustment = match self.origin {
+            CoordinatesOrigin::Center => Mat4::identity(),
+            CoordinatesOrigin::BottomLeft => Mat4([
+                [1.0, 0.0, 0.0, 1.0],
+                [0.0, 1.0, 0.0, 1.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]),
+        };
+
+        let model = renderer.get_model_matrix();
+
+        let mvp = projection * view * model * adjustment;
 
         self.frame
             .draw(

@@ -31,7 +31,7 @@ impl Game for Camera {
     }
 
     fn render(&mut self, canvas: &mut Canvas, context: &mut Context) {
-        let positions = vec![(-1.0, -1.0), (0.0, -1.0), (0.0, 0.0), (-1.0, 0.0)];
+        let positions = vec![(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)];
 
         let colors = vec![
             (1.0, 0.0, 0.0),
@@ -41,10 +41,11 @@ impl Game for Camera {
         ];
 
         canvas.clear(0.1, 0.1, 0.1);
-        canvas.fit(0.5, 0.5);
+        canvas.bottom_left();
+        canvas.fit();
 
         let (x, y) = positions[self.camera_index];
-        canvas.look_at(x, y);
+        canvas.look_at(x + 1.0, y + 1.0);
 
         for i in 0..4 {
             context

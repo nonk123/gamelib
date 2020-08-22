@@ -9,11 +9,11 @@ impl Game for Spin {
 
     fn render(&mut self, canvas: &mut Canvas, context: &mut Context) {
         canvas.clear(0.0, 0.0, 0.0);
-        canvas.fit(1.0, 1.0);
+        canvas.fit();
         context
             .render("rect")
             .rotate(self.0)
-            .scale(0.5, 0.5)
+            .scale(2.0, 0.5)
             .shade(0.0, 1.0, 0.5)
             .commit(canvas);
     }

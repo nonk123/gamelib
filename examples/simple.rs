@@ -35,7 +35,8 @@ impl Game for Simple {
         let y = self.angle.sin() * dist;
 
         canvas.clear(0.0, 0.0, 0.0);
-        canvas.fit(1.0, 1.0);
+        canvas.size(1.0, 1.0);
+        canvas.fit();
         context
             .render("rect")
             .translate(x - size / 2.0, y - size / 2.0)

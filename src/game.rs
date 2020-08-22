@@ -5,50 +5,15 @@ use glium::glutin::ContextBuilder;
 
 use glium::glutin::event::{ElementState, Event, WindowEvent};
 
-use glium::uniforms::{AsUniformValue, UniformValue};
-
 use glium::{Display, Program};
 
 use std::collections::{HashMap, HashSet};
-use std::ops::Mul;
 use std::sync::Mutex;
 use std::time::Instant;
 
 use crate::render::{Canvas, Model, ModelRenderBuilder, FRAGMENT_SHADER, VERTEX_SHADER};
 
 pub use glium::glutin::event::VirtualKeyCode as KeyCode;
-
-pub type Vec2 = (f32, f32);
-pub type Color = (f32, f32, f32);
-
-#[derive(Copy, Clone)]
-pub struct Mat4(pub [[f32; 4]; 4]);
-
-impl Mul for Mat4 {
-    type Output = Self;
-
-    fn mul(self, other: Self) -> Self {
-        let mut result = self;
-
-        for i in 0..4 {
-            for j in 0..4 {
-                result.0[i][j] = 0.0;
-
-                for n in 0..4 {
-                    result.0[i][j] += self.0[i][n] * other.0[n][j];
-                }
-            }
-        }
-
-        result
-    }
-}
-
-impl AsUniformValue for Mat4 {
-    fn as_uniform_value(&self) -> UniformValue {
-        AsUniformValue::as_uniform_value(&self.0)
-    }
-}
 
 pub struct GameConfig {
     pub title: String,
